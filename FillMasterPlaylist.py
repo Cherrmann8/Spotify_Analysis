@@ -93,7 +93,7 @@ print(f'Found {duplicate_tracks} duplicate tracks across playlists...\n')
 
 # Add all tracks from library to dictionary
 
-sp_library_tracks = sp.current_user_saved_tracks(3)
+# sp_library_tracks = sp.current_user_saved_tracks(3)
 sp_track_offset = 0
 duplicate_tracks = 0
 
