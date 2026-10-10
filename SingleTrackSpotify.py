@@ -31,7 +31,7 @@ sp = spotipy.Spotify(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
-        scope='playlist-read-private'
+        scope='playlist-read-private user-library-read'
     )
 )
 
@@ -45,7 +45,7 @@ sp_playlist_track = sp.playlist_items(sp_playlist['items'][2]['id'], limit=1)
 print(json.dumps(sp_playlist_track, indent=4))
 print("\n\n")
 
-item = sp_playlist_track
+item = sp_playlist_track['items'][0]
 test_track = {}
 
 test_track['name'] = f'{item['item']['name']} - {item['item']['artists'][0]['name']}'
@@ -61,6 +61,6 @@ test_track['features'] = {}
 print(json.dumps(test_track, indent=4))
 print("\n\n")
 
-sp_library_track = sp.current_user_saved_tracks(limit=1)
+sp_library_track = sp.current_user_saved_tracks(limit=50, offset=1)
 
 print(json.dumps(sp_library_track, indent=4))

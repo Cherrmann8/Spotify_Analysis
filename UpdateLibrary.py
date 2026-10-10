@@ -29,7 +29,7 @@ sp = spotipy.Spotify(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
-        scope='playlist-read-private playlist-modify-private user-library-modify'
+        scope='playlist-read-private playlist-modify-private user-library-modify user-library-read'
     )
 )
 
@@ -69,12 +69,13 @@ for playlist_id in all_playlists:
     sp_track_offset = 0
 
     while True:
-        sp_playlist_tracks = sp.playlist_items(playlist_id[1], fields='items(item(id, name))', limit=50, offset=sp_track_offset)
+        sp_playlist_tracks = sp.playlist_items(playlist_id[1], limit=50, offset=sp_track_offset)
         sp_tracks_found = len(sp_playlist_tracks['items'])
         sp_track_offset += sp_tracks_found
-        track_id = item['item']['name']
 
         for item in sp_playlist_tracks['items']:
+            track_id = item['item']['id']
+
             if track_id in all_tracks:
                 duplicate_tracks += 1
                 all_tracks[track_id]['playlists'].append(playlist_id[0])
@@ -85,7 +86,7 @@ for playlist_id in all_playlists:
                 all_tracks[track_id]['arist'] = item['item']['artists'][0]['name']
                 all_tracks[track_id]['album'] = item['item']['album']['name']
                 all_tracks[track_id]['track #'] = item['item']['track_number']
-                all_tracks[track_id]['uri'] = item['item']['uri']
+                all_tracks[track_id]['uri'] = item['item']['id']
                 all_tracks[track_id]['playlists'] = []
                 all_tracks[track_id]['first listen'] = ''
                 all_tracks[track_id]['features'] = {}
@@ -111,16 +112,26 @@ while True:
     sp_track_offset += sp_tracks_found
 
     for item in sp_library_tracks['items']:
-        if item['track']['id'] in all_tracks:
+        track_id = item['track']['id']
+
+        if track_id not in all_tracks:
+            all_tracks[track_id] = {}
+            all_tracks[track_id]['name'] = f'{item['track']['name']} - {item['track']['artists'][0]['name']}'
+            all_tracks[track_id]['title'] = item['track']['name']
+            all_tracks[track_id]['arist'] = item['track']['artists'][0]['name']
+            all_tracks[track_id]['album'] = item['track']['album']['name']
+            all_tracks[track_id]['track #'] = item['track']['track_number']
+            all_tracks[track_id]['uri'] = item['track']['id']
+            all_tracks[track_id]['playlists'] = []
+            all_tracks[track_id]['first listen'] = ''
+            all_tracks[track_id]['features'] = {}
             duplicate_tracks += 1
-        else:
-            all_tracks[item['track']['id']] = item['track']['name']
 
     if sp_tracks_found < 50:
         print(f'Found {sp_track_offset} tracks in library...')
         break
 
-print(f'Found {duplicate_tracks} duplicate tracks in library...\n')
+print(f'Found {duplicate_tracks} unassigned tracks in library...\n')
 
 
 print(f'Found {len(all_tracks)} tracks...\n')

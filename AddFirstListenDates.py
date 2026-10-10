@@ -1,10 +1,6 @@
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
-import streamlit as st
-import pandas as pd
-import os
-import requests
 import json
+from pathlib import Path
+from tqdm import tqdm
 
 """
 Go through the entire cleanedLibrary.json file and create a new json file that includes the "First Listen Dates" variable
@@ -12,95 +8,79 @@ Go through the entire cleanedLibrary.json file and create a new json file that i
 
 
 # GOBAL VARIABLES
-# CLIENT_ID = os.environ.get('CLIENT_ID') # Spotify client id (thats me!)
-# CLIENT_SECRET = os.environ.get('CLIENT_SECRET') # Spotify secret id (thats my secret code so people can't access my account)
-# REDIRECT_URI = 'http://127.0.0.1:5000'
+
+STREAMING_HISTORY_PATH = 'C:/Users/charl/Documents/VSC Python Projects/Spotify_Analysis/Spotify Data/Extended Streaming History'
+CACHED_LIBRARY_PATH = '2026-10-10_Library.json'
+
+print('Updating all songs with first listen dates...\n')
 
 
-# Connect to Spotify API via authentication
-# TODO - scope needs to be changed to access playlists (if I eventually do want to dynamically change playlists)
-# sp = spotipy.Spotify(
-#     auth_manager=SpotifyOAuth(
-#         client_id=CLIENT_ID,
-#         client_secret=CLIENT_SECRET,
-#         redirect_uri=REDIRECT_URI,
-#         scope='user-top-read'
-#     )
-# )
+# === Load cached library ===
 
-# Web browser display setup
-# st.set_page_config(page_title='song analysis', page_icon=':musical_note:')
-# st.title('Analysis for top songs, nerd')
-# st.write('Discover insights ya nerd')
+print('Loading cached library...')
 
-# TODO - load downloaded and cleaned Spotify data from json file for track ids
 library = None
+
 try:
-    with open('./cleanedLibrary.json', 'r', encoding='utf-8') as file:
+    with open(CACHED_LIBRARY_PATH, 'r', encoding='utf-8') as file:
         library = json.load(file)
 except FileNotFoundError:
-    print("Error: The file 'newLibrary.json' was not found.")
+    print(f"Error: The file {CACHED_LIBRARY_PATH} was not found.")
 except json.JSONDecodeError:
     print("Error: The file does not contain valid JSON.")
 
-# create new dictionary as a more useful data structure
-newLibrary = {}
-for track in library:
-    newLibrary[track['uri'][-22:]] = track
+print('Loaded...\n')
 
-# TODO - I have all ids from downloading my spotify data so no need to request ids here
-# # Grab some track ids from spotify api
-# top_tracks = sp.current_user_top_tracks(limit=10, time_range='short_term')
-# # print(json.dumps(top_tracks, indent=4))
-# track_ids = [track['id'] for track in top_tracks['items']]
-# track_names = [track['name'] for track in top_tracks['items']]
 
-# TODO - Maybe remvove this at end of project because I thought I needed to convert Spotify ids to Recco ids but I do not!
-# # Get Recco song ids
-# url = f'https://api.reccobeats.com/v1/track?ids={', '.join(track_ids)}'
-# payload = {}
-# headers = {'Accept': 'application/json'}
-# response = requests.request("GET", url, headers=headers, data=payload)
-#
-# r_dict = json.loads(response.text)
-# recco_ids = [track['id'] for track in r_dict['content']]
-#
-# print(json.dumps(recco_ids, indent=4))
+# === Loop through all files in the extended listening folder and see if they contain Track Ids in our cached library ===
 
-print(f'Sending {len(newLibrary)} requests...')
-processedRequests = 0
+print('Looping through listening history files...')
 
-# Get audio features in batches of 40 (the most recco beats can handle in one request)
-uris = list(newLibrary.keys())
-for i in range(0, len(library), 40):
-    chunk = uris[i : i + 40]
-    print(f'sending {len(chunk)}...')
-    url = 'https://api.reccobeats.com/v1/audio-features'
-    qparams = {'ids': chunk}
-    payload = {}
-    headers = {'Accept': 'application/json'}
-    response = requests.request("GET", url, headers=headers, data=payload, params=qparams)
+total_plays = 0
+finds = 0
 
-    # TODO - save audio features to a json file
-    jsonResponse = json.loads(response.text)
+folder_path = Path(STREAMING_HISTORY_PATH)
+file_paths = list(folder_path.glob("*.json"))
 
-    for trackFeatures in jsonResponse['content']:
-        newLibrary[trackFeatures['href'][-22:]]['features'] = {'acousticness': trackFeatures['acousticness'], 'danceability': trackFeatures['danceability'], 'energy': trackFeatures['energy'], 'instrumentalness': trackFeatures['instrumentalness'], 'liveness': trackFeatures['liveness'], 'loudness': trackFeatures['loudness'], 'speechiness': trackFeatures['speechiness'], 'tempo': trackFeatures['tempo'], 'valence': trackFeatures['valence']}
+print(f"Found {len(file_paths)} files...")
 
-    print(f"found {len(jsonResponse['content'])} / {len(chunk)}")
-    processedRequests += len(jsonResponse['content'])
+for i in tqdm(range(len(file_paths)), desc="Processing files"):
+    file_path = file_paths[i]
+    # print(f"Reading File: {file_path.name}...")
+    
+    with open(file_path, "r", encoding="utf-8") as file:
+        try:
+            data = json.load(file)
+            
+            for item in data:
+                if item['spotify_track_uri'] != None:
+                    track_id = item['spotify_track_uri'][-22:]
+                    if track_id in library:
+                        if library[track_id]['first listen'] == '':
+                            library[track_id]['first listen'] = item['ts']
+                            finds += 1
+                    total_plays += 1
+            
+        except json.JSONDecodeError:
+            print(f"Error: {file_path.name} is not a valid JSON file.")
+        except TypeError:
+            print(item)
 
-print(f'Processed {processedRequests} requests...')
+
+print(f'\nTotal plays: {total_plays}')
+print(f'Finds: {finds}\n')
+
+# === 
 
 print('Saving file...')
 
-file_path = "featureLibrary.json"
+file_path = CACHED_LIBRARY_PATH
 try:
     with open(file_path, "w") as f:
         # Use 'indent=4' for human-readable formatting (pretty printing)
-        json.dump(newLibrary, f, indent=4)
-    print(f"Data successfully saved to {file_path}")
+        json.dump(library, f, indent=4)
+    print(f"Data successfully saved to {file_path}\n")
 except IOError as e:
-    print(f"Error saving file: {e}")
+    print(f"Error saving file: {e}\n")
 
 print('Done!')
