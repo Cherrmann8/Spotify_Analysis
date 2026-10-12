@@ -35,15 +35,20 @@ total_tracks = 0
 total_assigned_playlists = 0
 total_first_listen = 0
 total_features = 0
+total_dups = 0
 
 for id in library:
     track = library[id]
     total_tracks += 1
     total_assigned_playlists += len(track['playlists'])
-    if track['first listen'] == '':
+    if len(track['first listen']) > 0:
         total_first_listen += 1
     if len(track['features']) > 0:
         total_features += 1
+
+    for id2 in library:
+        if id != id2 and library[id]['name'] == library[id2]['name']:
+            total_dups += 1
 
 
 print(f'Total tracks: {total_tracks}\n')
@@ -56,3 +61,5 @@ print(f'Missing first listens: {total_tracks - total_first_listen}\n')
 
 print(f'Total features: {total_features}')
 print(f'Missing features: {total_tracks - total_features}\n')
+
+print(f'Total dups: {total_dups}')
