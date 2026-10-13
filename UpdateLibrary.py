@@ -143,9 +143,9 @@ file_path = f"{date.today()}_Library.json"
 print(f'Saving file "{file_path}"...')
 
 try:
-    with open(file_path, "w") as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         # Use 'indent=4' for human-readable formatting (pretty printing)
-        json.dump(all_tracks, f, indent=4)
+        json.dump(all_tracks, f, indent=4, ensure_ascii=False)
     print(f'Data successfully saved to "{file_path}"')
 except IOError as e:
     print(f"Error saving file: {e}")

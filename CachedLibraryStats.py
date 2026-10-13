@@ -9,7 +9,7 @@ Get statistics for a cached library
 
 # GOBAL VARIABLES
 
-CACHED_LIBRARY_PATH = '2026-10-10_Library.json'
+CACHED_LIBRARY_PATH = '2026-10-13_Library_cleaned_dated.json'
 
 
 # === Load cached library ===
@@ -36,6 +36,7 @@ total_assigned_playlists = 0
 total_first_listen = 0
 total_features = 0
 total_dups = 0
+checked = {}
 
 for id in library:
     track = library[id]
@@ -46,8 +47,15 @@ for id in library:
     if len(track['features']) > 0:
         total_features += 1
 
+
     for id2 in library:
         if id != id2 and library[id]['name'] == library[id2]['name']:
+            if id not in checked:
+                print(f'{id}  -  {library[id]['name']}')
+                checked[id] = ''
+            if id2 not in checked:
+                print(f'{id2}  -  {library[id2]['name']}')
+                checked[id2] = ''
             total_dups += 1
 
 

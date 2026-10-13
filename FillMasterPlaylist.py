@@ -5,6 +5,8 @@ import pandas as pd
 import os
 import requests
 import json
+from tqdm import tqdm
+
 
 """
 Create and fill a master playlist containing all songs across all playlists and library
@@ -14,6 +16,9 @@ Create and fill a master playlist containing all songs across all playlists and 
 
 # === GOBAL VARIABLES & AUTHENTICATION ===
 
+CACHED_LIBRARY_PATH = '2026-10-13_Library_cleaned_dated.json'
+MASTER_PLAYLIST_ID = '3tjHWyNUPxRceFo9lrGtzS'
+CHUNK_SIZE = 100
 
 CLIENT_ID = os.environ.get('CLIENT_ID') # Spotify client id (thats me!)
 CLIENT_SECRET = os.environ.get('CLIENT_SECRET') # Spotify secret id (thats my secret code so people can't access my account)
@@ -40,84 +45,48 @@ sp = spotipy.Spotify(
 # print(json.dumps(new_playlist, indent=4))
 
 
-# === Create a list of a tracks across all playlists and library ===
+# === Load cached library and build translation dictionary ===
 
+print('Loading cached library...')
 
-print('Gathering all songs...\n')
+library = None
 
-# Get all playlists
+try:
+    with open(CACHED_LIBRARY_PATH, 'r', encoding='utf-8') as file:
+        library = json.load(file)
+except FileNotFoundError:
+    print(f"Error: The file {CACHED_LIBRARY_PATH} was not found.")
+except json.JSONDecodeError:
+    print("Error: The file does not contain valid JSON.")
 
-all_playlists = []
-sp_playlist_offset = 0
+print('Loaded...')
 
-while True:
-    # print(f'loop - offset: {sp_playlist_offset}')
-    sp_all_playlists = sp.current_user_playlists(limit=50, offset=sp_playlist_offset)
-    sp_playlists_found = len(sp_all_playlists['items'])
-    # print(sp_playlists_found)
-    sp_playlist_offset += sp_playlists_found
+print('Building translation list...')
 
-    for playlist in sp_all_playlists['items']:
-        if playlist['owner']['id'] == 'motley_':
-            all_playlists.append((playlist['name'], playlist['id']))
+translation_list = []
 
-    if sp_playlists_found < 50:
-        break
+for id in library:
+    translation_list.append((id, library[id]['first listen'], library[id]['name']))
 
-print(f'Found {len(all_playlists)} playlists...\n')
+translation_list = sorted(translation_list, key=lambda x: (x[1]))
 
-# Create a dictionary of all tracks from across all playlists
+# for i in range(len(translation_list)-100, len(translation_list)):
+#     print(translation_list[i])
 
-all_tracks = {}
-duplicate_tracks = 0
+print('Built...')
 
-for playlist_id in all_playlists:
-    sp_track_offset = 0
-
-    while True:
-        sp_playlist_tracks = sp.playlist_items(playlist_id[1], fields='items(item(id, name))', limit=50, offset=sp_track_offset)
-        sp_tracks_found = len(sp_playlist_tracks['items'])
-        sp_track_offset += sp_tracks_found
-
-        for item in sp_playlist_tracks['items']:
-            if item['item']['id'] in all_tracks:
-                duplicate_tracks += 1
-            else:
-                all_tracks[item['item']['id']] = item['item']['name']
-
-        if sp_tracks_found < 50:
-            print(f'Found {sp_track_offset} tracks in playlist: {playlist_id[0]}...')
-            break
-
-print(f'Found {duplicate_tracks} duplicate tracks across playlists...\n')
-
-# Add all tracks from library to dictionary
-
-# sp_library_tracks = sp.current_user_saved_tracks(3)
-sp_track_offset = 0
-duplicate_tracks = 0
-
-while True:
-    sp_library_tracks = sp.current_user_saved_tracks(limit=50, offset=sp_track_offset)
-    sp_tracks_found = len(sp_library_tracks['items'])
-    sp_track_offset += sp_tracks_found
-
-    for item in sp_library_tracks['items']:
-        if item['track']['id'] in all_tracks:
-            duplicate_tracks += 1
-        else:
-            all_tracks[item['track']['id']] = item['track']['name']
-
-    if sp_tracks_found < 50:
-        print(f'Found {sp_track_offset} tracks in library...')
-        break
-
-print(f'Found {duplicate_tracks} duplicate tracks in library...\n')
-
-
-print(f'Found {len(all_tracks)} tracks...\n')
+print(f'Found {len(library)} tracks...\n')
 
 # === Add all tracks on list to master playlist ===
 
-print(f'Adding tracks to master playlist...\n')
+print(f'Adding tracks to master playlist...')
 
+for i in tqdm(range(0, len(translation_list), CHUNK_SIZE), desc="Processing files"):
+    chunk = [tup[0] for tup in translation_list[i:i + CHUNK_SIZE]]
+    try:
+        sp.playlist_add_items(MASTER_PLAYLIST_ID, chunk)
+        # print(f"Successfully added tracks {i} to {i + len(chunk)}")
+    except Exception as e:
+        print(f"Error adding chunk starting at index {i}: {e}")
+
+print('Done!')
